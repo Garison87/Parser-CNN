@@ -1,0 +1,81 @@
+import time
+import os
+import os.path
+import requests
+import re
+from bs4 import BeautifulSoup
+
+date = time.strftime('/%Y/%m/%d/').lower()
+folder = time.strftime('%d.%m.%Y').lower()
+
+
+def create_html_fail(tabs):
+    """ Скачивание html страницы """
+
+    for tab in tabs:
+        if os.path.isfile(f"cnn_{tab}.txt"):
+            os.remove(f"cnn_{tab}.txt")
+        url = f'https://edition.cnn.com/{tab}'
+        html = requests.get(url)
+        with open(f"cnn_{tab}.html", 'wb') as file:
+            file.write(html.content)
+        search_articles_titles(tab)
+
+
+def search_articles_titles(tab):
+    """ Поиск статей с помощью BeautifulSoup """
+
+    with open(f"cnn_{tab}.html", 'r', encoding='utf-8') as file:
+        soup = BeautifulSoup(file.read(), 'html.parser')
+        sections = soup.select('body')[0].select('div.zone__inner')[0].select('div.stack')
+        for section in sections:
+            articles = section.find_all(attrs={'data-component-name': 'card'})
+            for article in articles:
+                url = article.find('a')['href']
+                if date in url:
+                    # title = article.find(attrs={'data-editable': 'headline'}).text.strip()
+                    title = translate_func(article.find(attrs={'data-editable': 'headline'}).text.strip())
+                    with open(f"cnn_{tab}.txt", 'a', encoding='utf-8') as file_txt:
+                        file_txt.write(f"{title}\n")
+                        file_txt.write(f"https://edition.cnn.com{url}\n\n")
+
+
+def translate_func(message):
+    """ Переводчик """
+
+    IAM_TOKEN = 't1.9euelZrLlpDJyomKkI7Hi8vImsiaz-3rnpWajoqKl8bNjZOQnpiVzMyQzc3l8_cUaVFd-e8KM0BY_d3z91QXT1357wozQFj9.5JkUQ6Y70GIfkvxE9YBJMd2Y8PHH5yg6x-jeZp92ZDbOSPODBJB7ErD4hh0sL0bqGuZO4N8J5r83s6mw96KsCQ'
+    folder_id = 'b1g0hp1jv0o3lkhso3q1'
+    target_language = 'ru'
+    text = message
+
+    body = {
+        "targetLanguageCode": target_language,
+        "texts": text,
+        "folderId": folder_id,
+    }
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {0}".format(IAM_TOKEN)
+    }
+
+    response = requests.post('https://translate.api.cloud.yandex.net/translate/v2/translate',
+                             json=body,
+                             headers=headers
+                             )
+    return response.json()['translations'][0]['text']
+
+
+def main():
+    tabs = ['us', 'world', 'politics', 'business', 'opinions', 'health', 'entertainment', 'sport']
+    create_html_fail(tabs)
+    # search_articles_titles()
+
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+
